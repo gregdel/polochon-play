@@ -15,7 +15,11 @@ TMPDIR=${TMPDIR:=/tmp}
 CACHE_DELAY=$(( 60 * 5 ))
 
 _usage() {
-	_log_err "$(basename "$0") [movies|shows]"
+	echo "$(basename "$0"):"
+	echo "    m|movie|movies - Choose and stream a movie"
+	echo "    s|show|shows   - Choose and stream a show episode"
+	echo "    c|clean        - Cleanup the cache"
+	exit 0
 }
 
 _polochon_call() {
@@ -101,8 +105,14 @@ _shows() {
 	_mpv "$episode_title" "$episode_uri" "$subtitles"
 }
 
+_clean_cache() {
+	_log "Cleaning cache"
+	rm "$TMPDIR/polochon_*.json" 2>/dev/null
+}
+
 case "$1" in
-	m|movie|movies) _movies ;;
-	s|show|shows)   _shows  ;;
-	*)              _usage  ;;
+	m|movie|movies) _movies       ;;
+	s|show|shows)   _shows        ;;
+	c|clean)        _clean_cache  ;;
+	*)              _usage        ;;
 esac
