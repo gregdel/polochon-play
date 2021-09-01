@@ -1,11 +1,11 @@
 #!/bin/sh
 
 _log() {
-	echo "$@"
+	printf "$(tput setaf 5)-->$(tput setaf 2) %s$(tput setaf 7)\n" "$@"
 }
 
 _log_err() {
-	_log "$@"
+	printf "$(tput setaf 6)-->$(tput setaf 9) %s$(tput setaf 7)\n" "$@"
 	exit 1
 }
 
