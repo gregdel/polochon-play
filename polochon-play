@@ -1,0 +1,106 @@
+#!/bin/sh
+
+_log() {
+	echo "$@"
+}
+
+_log_err() {
+	_log "$@"
+	exit 1
+}
+
+[ -z "$POLOCHON_TOKEN" ] && _log_err "Missing polochon token"
+
+polochon_url="https://polochon.quimbo.fr"
+
+_polochon_call() {
+	method=$1
+	resource=$2
+	curl --silent --show-error \
+		-X "$method" \
+		-H "Content-Type: application/json" \
+		-H "X-Auth-Token: $POLOCHON_TOKEN" \
+		"https://polochon.quimbo.fr/$resource"
+}
+
+_fzf() {
+	prompt=$1
+
+	fzf --prompt="$prompt > "
+}
+
+_mpv() {
+	title=$1
+	uri=$2
+	subtitles=$3
+
+	sub_cmd=
+	for lang in $subtitles; do
+		sub_cmd="$sub_cmd --sub-file=$uri/subtitles/$lang/download?lang=$lang"
+	done
+
+	mpv \
+		--http-header-fields="X-Auth-Token: $POLOCHON_TOKEN" \
+		--title="$title" \
+		$sub_cmd \
+		"$uri/download"
+}
+
+_movies() {
+	MOVIE_CACHE=/tmp/polochon_movies.json
+	if [ ! -f "$MOVIE_CACHE" ]; then
+		_log "Fetching the movies from polochon..."
+		_polochon_call "GET" "movies" > "$MOVIE_CACHE"
+	fi
+
+	title=$(jq -r '.[] | .title?' "$MOVIE_CACHE" | _fzf "Choose movie")
+	[ -n "$title" ] || _log_err "No movie selected"
+
+	movie=$(jq -r "to_entries | .[] | select(.value.title == \"$title\")" "$MOVIE_CACHE")
+	imdb_id=$(echo "$movie" | jq -r .key)
+	subtitles=$(echo "$movie" | jq -r '.value.subtitles? | .[] | select(.embedded == false) | .lang')
+
+	_log "Streaming \"$title\" ($imdb_id)"
+
+	movie_uri="$polochon_url/movies/$imdb_id"
+	_mpv "$title" "$movie_uri" "$subtitles"
+}
+
+_shows() {
+	SHOW_CACHE=/tmp/polochon_shows.json
+	if [ ! -f "$SHOW_CACHE" ]; then
+		_log "Fetching the shows from polochon..."
+		_polochon_call "GET" "shows" > "$SHOW_CACHE"
+	fi
+
+	title=$(jq -r '.[] | .title?' "$SHOW_CACHE" | _fzf "Choose show")
+	[ -n "$title" ] || _log_err "No show selected"
+
+	show=$(jq -r "to_entries | .[] | select(.value.title == \"$title\")" "$SHOW_CACHE")
+	imdb_id=$(echo "$show" | jq -r .key)
+
+	season=$(echo "$show" | jq -r ".value.seasons | keys | .[]" | _fzf "Choose season")
+	[ -n "$season" ] || _log_err "No season selected"
+
+	episode=$(echo "$show" | jq -r ".value.seasons.\"$season\" | keys | .[]" | _fzf "Choose episode")
+	[ -n "$episode" ] || _log_err "No episode selected"
+
+	_log "Title: $title"
+	_log "Season: $season"
+	_log "Episode: $episode"
+
+	subtitles=$(echo "$show" | jq -r ".value.seasons.\"$season\".\"$episode\".subtitles? | .[] | select(.embedded == false) | .lang")
+
+	episode_uri="$polochon_url/shows/$imdb_id/seasons/$season/episodes/$episode"
+	_mpv "$title S${season}E$episode" "$episode_uri" "$subtitles"
+}
+
+_usage() {
+	_log_err "$(basename "$0") [movies|shows]"
+}
+
+case "$1" in
+	m|movie|movies) _movies ;;
+	s|show|shows)   _shows  ;;
+	*)              _usage  ;;
+esac
