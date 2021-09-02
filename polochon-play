@@ -9,8 +9,9 @@ _log_err() {
 	exit 1
 }
 
+[ -z "$POLOCHON_URL" ] && _log_err "Missing polochon url"
 [ -z "$POLOCHON_TOKEN" ] && _log_err "Missing polochon token"
-POLOCHON_URL="https://polochon.quimbo.fr"
+
 TMPDIR=${TMPDIR:=/tmp}
 CACHE_DELAY=$(( 60 * 5 ))
 
