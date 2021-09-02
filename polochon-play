@@ -48,8 +48,14 @@ _fetch() {
 }
 
 _fzf() {
-	prompt=$1
-	fzf --prompt="$prompt > "
+	header=$1
+	shift
+	fzf --prompt="> " \
+		--no-multi \
+		--header="$header" \
+		--color dark,hl:33,hl+:234,fg+:234,bg+:136 \
+		--color info:254,prompt:33,spinner:136,pointer:136,marker:136 \
+		"$@"
 }
 
 _mpv() {
@@ -62,6 +68,7 @@ _mpv() {
 		sub_cmd="$sub_cmd --sub-file=$uri/subtitles/$lang/download?lang=$lang"
 	done
 
+	_log "Streaming \"$title\""
 	mpv \
 		--http-header-fields="X-Auth-Token: $POLOCHON_TOKEN" \
 		--title="$title" \
@@ -70,14 +77,15 @@ _mpv() {
 }
 
 _movies() {
-	title=$(_fetch "movies" | jq -r '.[] | .title?' | _fzf "Choose movie")
+	title=$(_fetch "movies" | jq -r '.[] | .title?' | sort | _fzf "Choose movie")
 	[ -n "$title" ] || _log_err "No movie selected"
 
-	movie=$(_fetch "movies" | jq -r "to_entries | .[] | select(.value.title == \"$title\")")
-	imdb_id=$(echo "$movie" | jq -r .key)
-	subtitles=$(echo "$movie" | jq -r '.value.subtitles? | .[] | select(.embedded == false) | .lang')
+	movie=$(_fetch "movies" | jq -r -c --arg title "$title" 'to_entries | .[] | select(.value.title == $title)')
 
-	_log "Streaming \"$title\" ($imdb_id)"
+	imdb_id=$(jq -n -r --argjson movie "$movie" '$movie.key')
+	subtitles=$(jq -n -r --argjson movie "$movie" '$movie.value.subtitles[] | select(.embedded == false)? | .lang')
+
+	_log "Imdb: https://imdb.com/title/$imdb_id"
 
 	movie_uri="$POLOCHON_URL/movies/$imdb_id"
 	_mpv "$title" "$movie_uri" "$subtitles"
@@ -87,20 +95,32 @@ _shows() {
 	title=$(_fetch "shows" | jq -r '.[] | .title?' | _fzf "Choose show")
 	[ -n "$title" ] || _log_err "No show selected"
 
-	show=$(_fetch "shows" | jq -r "to_entries | .[] | select(.value.title == \"$title\")")
-	imdb_id=$(echo "$show" | jq -r .key)
+	show=$(_fetch "shows" | jq -r -c --arg title "$title" 'to_entries | .[] | select(.value.title == $title)')
+	imdb_id=$(jq -r -n --argjson show "$show" '$show.key')
 
-	season=$(echo "$show" | jq -r ".value.seasons | keys | .[]" | _fzf "Choose season")
+	season=$(jq -r -n \
+		--argjson show "$show" \
+		'$show.value.seasons | keys | .[]' \
+		| _fzf "Choose season")
 	[ -n "$season" ] || _log_err "No season selected"
 
-	episode=$(echo "$show" | jq -r ".value.seasons.\"$season\" | keys | .[]" | _fzf "Choose episode")
+	episode=$(jq -r -n \
+		--argjson show "$show" \
+		--arg season "$season" \
+		'$show.value.seasons | .[$season] | keys | .[]' \
+		| _fzf "Choose episode")
 	[ -n "$episode" ] || _log_err "No episode selected"
 
-	subtitles=$(echo "$show" | jq -r ".value.seasons.\"$season\".\"$episode\".subtitles? | .[] | select(.embedded == false) | .lang")
+	subtitles=$(jq -r -n \
+		--argjson show "$show" \
+		--arg season "$season" \
+		--arg episode "$episode" \
+		'$show.value.seasons | .[$season] | .[$episode] | .subtitles[] | select(.embedded == false)? | .lang')
+
+
+	_log "Imdb: https://imdb.com/title/$imdb_id"
 
 	episode_title="$title S${season}E$episode"
-	_log "Streaming $episode_title"
-
 	episode_uri="$POLOCHON_URL/shows/$imdb_id/seasons/$season/episodes/$episode"
 	_mpv "$episode_title" "$episode_uri" "$subtitles"
 }
