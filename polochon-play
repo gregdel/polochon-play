@@ -63,12 +63,16 @@ _mpv() {
 	uri=$2
 	subtitles=$3
 
+	_log "Streaming \"$title\""
+
+	[ -n "$subtitles" ] && _log "Extra subtitles:"
+
 	sub_cmd=
 	for lang in $subtitles; do
 		sub_cmd="$sub_cmd --sub-file=$uri/subtitles/$lang/download?lang=$lang"
+		_log "  - $lang"
 	done
 
-	_log "Streaming \"$title\""
 	mpv \
 		--http-header-fields="X-Auth-Token: $POLOCHON_TOKEN" \
 		--title="$title" \
