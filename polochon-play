@@ -83,7 +83,7 @@ _mpv() {
 }
 
 _movies() {
-	title=$(_fetch "movies" | jq -r '.[] | .title?' | sort | _fzf "Choose movie")
+	title=$(_fetch "movies" | jq -r '.[] | .title?' | sort | _fzf "Choose the movie")
 	[ -n "$title" ] || _log_err "No movie selected"
 
 	movie=$(_fetch "movies" | jq -r -c --arg title "$title" 'to_entries | .[] | select(.value.title == $title)')
@@ -98,7 +98,7 @@ _movies() {
 }
 
 _shows() {
-	title=$(_fetch "shows" | jq -r '.[] | .title?' | _fzf "Choose show")
+	title=$(_fetch "shows" | jq -r '.[] | .title?' | _fzf "Choose the show")
 	[ -n "$title" ] || _log_err "No show selected"
 
 	show=$(_fetch "shows" | jq -r -c --arg title "$title" 'to_entries | .[] | select(.value.title == $title)')
@@ -107,14 +107,14 @@ _shows() {
 	season=$(jq -r -n \
 		--argjson show "$show" \
 		'$show.value.seasons | keys | .[]' \
-		| _fzf "Choose season")
+		| _fzf "Choose the season")
 	[ -n "$season" ] || _log_err "No season selected"
 
 	episode=$(jq -r -n \
 		--argjson show "$show" \
 		--arg season "$season" \
 		'$show.value.seasons | .[$season] | keys | .[]' \
-		| _fzf "Choose episode")
+		| _fzf "Choose the episode")
 	[ -n "$episode" ] || _log_err "No episode selected"
 
 	subtitles=$(jq -r -n \
