@@ -26,6 +26,7 @@ _polochon_call() {
 	method=$1
 	resource=$2
 	curl --silent --show-error \
+		--compressed \
 		-X "$method" \
 		-H "Content-Type: application/json" \
 		-H "X-Auth-Token: $POLOCHON_TOKEN" \
@@ -131,7 +132,7 @@ _shows() {
 
 _clean_cache() {
 	_log "Cleaning cache"
-	rm "$TMPDIR/polochon_*.json" 2>/dev/null
+	rm "$TMPDIR"/polochon_*.json 2>/dev/null
 }
 
 case "$1" in
