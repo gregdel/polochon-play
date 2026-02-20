@@ -64,6 +64,7 @@ _mpv() {
 	title=$1
 	uri=$2
 	subtitles=$3
+	filename=$4
 
 	_log "Streaming \"$title\""
 
@@ -71,7 +72,9 @@ _mpv() {
 
 	sub_cmd=
 	for lang in $subtitles; do
-		sub_cmd="$sub_cmd --sub-file=$uri/subtitles/$lang/download?lang=$lang"
+		base="${filename%.*}"
+		short_lang="${lang%%_*}"
+		sub_cmd="$sub_cmd --sub-file=$uri/subtitles/$lang/download/${base}.${short_lang}.srt"
 		_log "  - $lang"
 	done
 
@@ -79,7 +82,7 @@ _mpv() {
 		--http-header-fields="X-Auth-Token: $POLOCHON_TOKEN" \
 		--title="$title" \
 		$sub_cmd \
-		"$uri/download?title=$title"
+		"$uri/download/$filename"
 }
 
 _movies() {
@@ -90,11 +93,12 @@ _movies() {
 
 	imdb_id=$(jq -n -r --argjson movie "$movie" '$movie.key')
 	subtitles=$(jq -n -r --argjson movie "$movie" '$movie.value.subtitles[] | select(.embedded == false)? | .lang')
+	filename=$(jq -n -r --argjson movie "$movie" '$movie.value.filename')
 
 	_log "Imdb: https://imdb.com/title/$imdb_id"
 
 	movie_uri="$POLOCHON_URL/movies/$imdb_id"
-	_mpv "$title" "$movie_uri" "$subtitles"
+	_mpv "$title" "$movie_uri" "$subtitles" "$filename"
 }
 
 _shows() {
@@ -123,12 +127,17 @@ _shows() {
 		--arg episode "$episode" \
 		'$show.value.seasons | .[$season] | .[$episode] | .subtitles[] | select(.embedded == false)? | .lang')
 
+	filename=$(jq -r -n \
+		--argjson show "$show" \
+		--arg season "$season" \
+		--arg episode "$episode" \
+		'$show.value.seasons | .[$season] | .[$episode] | .filename')
 
 	_log "Imdb: https://imdb.com/title/$imdb_id"
 
 	episode_title="$title S${season}E$episode"
 	episode_uri="$POLOCHON_URL/shows/$imdb_id/seasons/$season/episodes/$episode"
-	_mpv "$episode_title" "$episode_uri" "$subtitles"
+	_mpv "$episode_title" "$episode_uri" "$subtitles" "$filename"
 }
 
 _clean_cache() {
